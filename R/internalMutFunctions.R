@@ -92,20 +92,11 @@ clip_read_pair <- function(reads_df = NULL) {
 check_mutfile_columns <- function(df) {
   # Define expected columns
   expected_cols <- c("chr", "pos", "ref", "alt")
-  expected_types <- c("character", "integer", "character", "character")
 
   # Check if all expected columns are present
   if (!all(expected_cols %in% colnames(df))) {
       return(paste("Mutation file column names are incorrect or missing.",
                    "Expected columns:", toString(expected_cols), "."))
-  }
-
-  # Check if the column types are correct
-  actual_types <- sapply(df[expected_cols], class)
-  if (!all(actual_types == expected_types)) {
-    return(paste("Mutation File column types are incorrect, found: ",
-                 toString(actual_types), " expected: ",
-                 toString(expected_types)))
   }
 
   # If all checks pass, return confirmation
@@ -172,16 +163,18 @@ read_mutation_file <- function(mutation_file) {
 
   # Read in the TSV mutation file
   message("Reading in the provided mutation file...")
+  column_types <- c("character", "integer", "character", "character")
   bed <- read.table(mutation_file,
                     header = TRUE, sep="\t",
-                    quote="", stringsAsFactors = FALSE)
+                    quote="", stringsAsFactors = FALSE,
+                    colClasses=column_types)
 
   # Check whether the file format is correct
   result <- check_mutfile_columns(bed)
 
   if (result == "Mutation file checks passed successfully!") {
     message("Mutation file is formatted correctly.")
-  
+
     # Remove mutations that are less than 1000 bp apart
     bed <- remove_clustered_mutations(bed)
 
@@ -215,7 +208,7 @@ read_mutation_file <- function(mutation_file) {
 #' @return The path to the output file as a character string.
 #'
 #' @export
-#' 
+#'
 #' @examples
 #' output_path <- writeMutTable(gr, "output_directory", "output_filename")
 #' print(paste("File written to:", output_path))
@@ -422,7 +415,7 @@ remove_insertion_bases <- function(cigar, clip_seq) {
       }
       position_in_read <- position_in_read + len
     } else if (op %in% c("M", "X", "=")) {
-      # Advance the position in the read by the length of M, DEL 
+      # Advance the position in the read by the length of M, DEL
       position_in_read <- position_in_read + len
     } else if (op == "S" || op == "H" || op == "D") {
       # Skip soft clips and hard clips in sequence position calculations
@@ -1125,7 +1118,7 @@ calculate_read_length <- function(cigar) {
   } else {
     length <- 0
   }
-  
+
   return(length)
 }
 
@@ -1142,7 +1135,7 @@ calculate_read_length <- function(cigar) {
 process_duplicate_read_pairs <- function(genomic_data, mut_fragments_only) {
   # Initialize the reads_df variable
   reads_df <- NULL
-  
+
   # Check if input is a GAlignments or GRanges object and adjust accordingly
   if (is(genomic_data, "GAlignmentPairs")) {
     reads_df <- as.data.frame(genomic_data)
@@ -1315,9 +1308,9 @@ process_mutation_fragments <- function(
   reads_df <- reads_df[, !names(reads_df) %in% columns_to_remove]
 
   # Check if there is soft clipping in 'cigar.first' or 'cigar.last'
-  if (any(grepl("S", reads_df$cigar.first)) || 
+  if (any(grepl("S", reads_df$cigar.first)) ||
       any(grepl("S", reads_df$cigar.last))) {
-        
+
         # Call the function if soft clipping is detected
         reads_df <- clip_read_pair(reads_df)
   }
@@ -1436,11 +1429,11 @@ process_mutation_fragments <- function(
   reads_df <- reads_df %>%
     select(unique_read_pair_id, which_mutation,
            mutation_status, mutation_locus_bq)
-  
+
   # Update mutation_status based on mutation_locus_bq compared to galp_bqFilter
   reads_df <- reads_df %>%
-    mutate(mutation_status = if_else(mutation_locus_bq < galp_bqFilter, 
-                                     "failed_galp_bqFilter", 
+    mutate(mutation_status = if_else(mutation_locus_bq < galp_bqFilter,
+                                     "failed_galp_bqFilter",
                                      mutation_status))
 
   # Extract Seqinfo from the existing frag GRanges object to add it back later
@@ -1505,7 +1498,7 @@ process_mutation_fragments <- function(
 #' @importFrom dplyr filter
 #' @importFrom GenomicRanges GRanges
 #' @noRd
-process_bam_file <- function(bamfile, 
+process_bam_file <- function(bamfile,
                              mutation_file = NULL,
                              mut_fragments_only = FALSE,
                              use_names = FALSE,
@@ -1548,7 +1541,7 @@ process_bam_file <- function(bamfile,
     )
 
     if (mut_fragments_only) {
-      galp <- bam_to_galp_mut(bamfile = bamfile, 
+      galp <- bam_to_galp_mut(bamfile = bamfile,
                               use_names = use_names,
                               chromosome_to_keep = chromosome_to_keep,
                               strand_mode = strand_mode,
@@ -1592,7 +1585,7 @@ process_bam_file <- function(bamfile,
     }
   } else {
     # Process all alignments when no mutation file is provided
-    galp <- bam_to_galp2(bamfile = bamfile, 
+    galp <- bam_to_galp2(bamfile = bamfile,
                          use_names = use_names,
                          chromosome_to_keep = chromosome_to_keep,
                          strand_mode = strand_mode,
@@ -1621,12 +1614,12 @@ create_empty_galp <- function() {
   empty_last <- GenomicAlignments::GAlignments(
     seqnames=character(), cigar=character()
   )
-  
+
   # Combine into a GAlignmentPairs object
   empty_galp <- GenomicAlignments::GAlignmentPairs(
     first=empty_first, last=empty_last
   )
-  
+
   return(empty_galp)
 }
 
@@ -1640,18 +1633,18 @@ get_genome_reference <- function(frag_obj_mut) {
   # Extract genome sequence from GRanges object's seqinfo
   genome_seq <- unique(
     as.character(GenomeInfoDb::seqinfo(frag_obj_mut)@genome))
-  
+
   # Define genome versions and corresponding BSgenome data packages
   genome_versions <- c("GRCh38", "hg38-NCBI", "hg38", "hg19")
   genome_packages <- c(
-    "BSgenome.Hsapiens.NCBI.GRCh38::BSgenome.Hsapiens.NCBI.GRCh38", 
-    "BSgenome.Hsapiens.NCBI.GRCh38::BSgenome.Hsapiens.NCBI.GRCh38", 
-    "BSgenome.Hsapiens.UCSC.hg38::BSgenome.Hsapiens.UCSC.hg38", 
+    "BSgenome.Hsapiens.NCBI.GRCh38::BSgenome.Hsapiens.NCBI.GRCh38",
+    "BSgenome.Hsapiens.NCBI.GRCh38::BSgenome.Hsapiens.NCBI.GRCh38",
+    "BSgenome.Hsapiens.UCSC.hg38::BSgenome.Hsapiens.UCSC.hg38",
     "BSgenome.Hsapiens.UCSC.hg19::BSgenome.Hsapiens.UCSC.hg19")
-  
+
   # Find the index of the genome sequence in the genome_versions vector
   index <- match(genome_seq, genome_versions)
-  
+
   # Return the corresponding genome package; default to hg19 if not found
   if (!is.na(index)) {
     return(eval(parse(text = genome_packages[index])))
@@ -1821,7 +1814,7 @@ summarize_fragment_lengths <- function(gr_df) {
 #' @noRd
 update_consensus_mismatch <- function(merged_table_df, gr_df, mapping) {
   set.seed(123)  # For reproducibility in random selection
-  
+
   # Iterate over each row in merged_table_df to update consensus_mismatch
   for (i in 1:nrow(merged_table_df)) {
     target_mutation <- merged_table_df$target_mutation[i]
@@ -2351,8 +2344,8 @@ process_length_mut <- function(frag_obj, ref_type, downsample_ref) {
     check_mutation_status(as.data.frame(frag_obj))
 
     # Filter out discordant and non-MUT base (other) fragments
-    size_table_inner <- dplyr::filter(as.data.frame(frag_obj), 
-                                      !grepl("discordant", mutation_status), 
+    size_table_inner <- dplyr::filter(as.data.frame(frag_obj),
+                                      !grepl("discordant", mutation_status),
                                       grepl("MUT", mutation_status))
 
     # Determine the count for downsampling or normalization

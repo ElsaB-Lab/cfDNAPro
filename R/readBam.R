@@ -107,6 +107,21 @@ readBam <- function(bamfile,
     stop("Input is not paired-end Bam file.")
   }
 
+  # Check required arguments only when a mutation file is used.
+  if (!is.null(mutation_file)) {
+    required_galp_what_values <- c("cigar", "mapq", "isize", "seq", "qual")
+
+    if (!all(required_galp_what_values %in% galp_what)) {
+      missing_values <- setdiff(required_galp_what_values, galp_what)
+      missing_str <- paste(shQuote(missing_values), collapse = ", ")
+      error_message <- sprintf(
+        "Missing required 'galp_what' values when a 'mutation_file' is provided.\n  --> The following values are required but were not found: %s",
+        missing_str
+      )
+      stop(error_message)
+    }
+  }
+
   if (!genome_label %in% c("hg19", "hg38", "hg38-NCBI") || is.na(genome_label)) {
       stop("Only 'hg19', 'hg38', or 'hg38-NCBI' are accepted as genome labels.")
   }
